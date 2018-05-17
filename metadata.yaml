@@ -1,16 +1,20 @@
 name: lxd-cluster
 summary: LXD clustering charm
-maintainer: Michael Skalka <Michael.Skalka@canonical.com>
+maintainers:
+  - Michael Skalka <Michael.Skalka@canonical.com>
+  - Marco Ceppi <marco@ceppi.net>
 description: |
-  LXD Clustering charm
+  Create and scale an LXD 3.0 cluster
 tags:
-  - misc
+  - lxd
+  - cluster
 series:
   - xenial
+  - bionic
 subordinate: false
 peers:
   cluster:
-    interface: cluster
+    interface: lxd-cluster
 storage:
   local:
     type: block

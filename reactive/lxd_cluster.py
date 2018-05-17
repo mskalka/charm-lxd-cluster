@@ -4,9 +4,16 @@ from base64 import (
     b64encode,
     b64decode
 )
+
 import subprocess
 
-from lxd_clustering_utils import (
+from charms.reactive import when
+from charms.reactive import when_any
+from charms.reactive import when_not
+from charms.reactive import set_state
+from charms.reactive import remove_state
+
+from charms.layer.lxd import (
     init_cluster,
     join_cluster,
 )
@@ -17,38 +24,35 @@ from charmhelpers.fetch import (
     apt_purge,
 )
 
-from charmhelpers.fetch.snap import (
-    snap_install,
-)
+from charms.layer import snap
 
-from charmhelpers.core.hookenv import (
-    Hooks,
-    config,
-    is_leader,
-    leader_set,
-    log,
-    related_units,
-    relation_set,
-    relation_get,
-    status_set,
-    unit_private_ip,
-)
+from charmhelpers.core import hookenv
 
 from charmhelpers.contrib.openstack.context import (
     ensure_packages,
 )
 
-hooks = Hooks()
 
-
-@hooks.hook('install.real')
-def install():
+@when_not('lxd.machine.ready')
+def prepare_machine():
     '''Install lxd here'''
-    status_set('maintenance', 'Installing charm packages')
+    status_set('maintenance', 'Preparing machine')
     apt_purge('lxd lxd-client')
-    apt_update()
-    apt_install('zfsutils-linux')
-    snap_install('lxd')
+
+    set_state('lxd.machine.ready')
+
+
+@when('lxd.machine.ready')
+@when_not('snap.installed.lxd')
+def install_snap():
+    channel = hookenv.config('channel')
+    # Grab the snap channel from config
+    snap.install('lxd', channel=channel)
+
+
+@when('snap.installed.lxd')
+@when_not('lxd.ready')
+def install():
 
     status_set('maintenance', 'Setting up zfs pool')
     log('Creating lxc storage "local" using zpool at {}.'.format(
@@ -56,20 +60,35 @@ def install():
     subprocess.call(['lxc', 'storage', 'create', 'local', 'zfs',
                      'source={}'.format(config('host-block-device'))])
     status_set('active', 'Unit is ready')
+    set_state('lxd.ready')
 
 
-@hooks.hook('config-changed',
-            'upgrade-charm',)
+@when('config.changed.extra-packages')
 def config_changed():
     '''Update installed packages, nothing else for now'''
     packages = config('extra-packages')
     ensure_packages(packages)
 
 
+@hook('upgrade-charm')
+def remove_states():
+    # stale state cleanup (pre rev6)
+    remove_state('lxd.installed')
+
+
+# TODO: Oh no, need to create interface
 @hooks.hook('cluster-relation-joined',
             'cluster-relation-changed',)
 def cluster_changed(relation_id=None):
     '''Perform LXD clustering operations here'''
+
+    if is_leader():
+        # Check if we have certs already
+        if not certs:
+            #init this shitttt
+            # Generate them
+            leader_set(certs)
+
     c_cert = b64decode(relation_get(rid=relation_id).get('cluster-cert', ''))
 
     if is_leader() and len(c_cert):

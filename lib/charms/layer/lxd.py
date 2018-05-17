@@ -1,6 +1,6 @@
-#!/usr/bin/python
 
 from copy import deepcopy
+
 import socket
 import subprocess
 import yaml
