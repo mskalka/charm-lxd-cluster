@@ -17,9 +17,5 @@ options:
     description: CIDR for LXD cluster
   host-block-device:
     type: string
-    default: '/dev/vdb'
+    default: '/dev/xvdf'
     description: Existing block device for zfs storage pool
-  host-pool-size:
-    type: int
-    default: 15
-    description: Desired zfs pool size in GB

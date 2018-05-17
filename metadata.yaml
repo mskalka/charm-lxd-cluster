@@ -5,7 +5,12 @@ description: |
   LXD Clustering charm
 tags:
   - misc
+series:
+  - xenial
 subordinate: false
 peers:
   cluster:
     interface: cluster
+storage:
+  local:
+    type: block

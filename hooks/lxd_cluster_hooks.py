@@ -1,4 +1,9 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+
+from base64 import (
+    b64encode,
+    b64decode
+)
 import subprocess
 
 from lxd_clustering_utils import (
@@ -6,27 +11,27 @@ from lxd_clustering_utils import (
     join_cluster,
 )
 
-from charmhelpers.core.fetch import (
+from charmhelpers.fetch import (
     apt_update,
     apt_install,
     apt_purge,
 )
 
+from charmhelpers.fetch.snap import (
+    snap_install,
+)
+
 from charmhelpers.core.hookenv import (
-    config,
     Hooks,
+    config,
     is_leader,
     leader_set,
     log,
-    network_get_primary_address,
     related_units,
     relation_set,
     relation_get,
     status_set,
-)
-
-from charmhelpers.core.fetch.snap import (
-    snap_install,
+    unit_private_ip,
 )
 
 from charmhelpers.contrib.openstack.context import (
@@ -36,7 +41,7 @@ from charmhelpers.contrib.openstack.context import (
 hooks = Hooks()
 
 
-@hooks.hook('install')
+@hooks.hook('install.real')
 def install():
     '''Install lxd here'''
     status_set('maintenance', 'Installing charm packages')
@@ -65,16 +70,16 @@ def config_changed():
             'cluster-relation-changed',)
 def cluster_changed(relation_id=None):
     '''Perform LXD clustering operations here'''
-    rdata = relation_get(rid=relation_id)['cluster-cert']
+    c_cert = b64decode(relation_get(rid=relation_id).get('cluster-cert', ''))
 
-    if is_leader() and not rdata:
-        leader_set(settings={'cluster-ip': network_get_primary_address()})
-        cert = init_cluster()
+    if is_leader() and len(c_cert):
+        leader_set(settings={'cluster-ip': unit_private_ip()})
+        n_cert = b64encode(init_cluster())
         for rid in related_units('cluster'):
             relation_set(relation_id=rid,
-                         relation_settings={'cluster-cert': cert})
-    elif not is_leader() and relation_get(rid=relation_id):
-        join_cluster(rdata)
+                         relation_settings={'cluster-cert': n_cert})
+    elif not is_leader() and len(c_cert):
+        join_cluster(c_cert)
 
 
 @hooks.hook('cluster-relation-departed')
