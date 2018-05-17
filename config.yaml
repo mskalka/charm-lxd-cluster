@@ -15,10 +15,6 @@ options:
     type: string
     default: '10.0.0.0/24'
     description: CIDR for LXD cluster
-  host-bridge-interface:
-    type: string
-    default: br0
-    description: Existing host bridge interface for LXD cluster
   host-block-device:
     type: string
     default: '/dev/vdb'

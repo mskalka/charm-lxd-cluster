@@ -1,19 +1,9 @@
 #!/usr/bin/python3
-import socket
 import subprocess
-import yaml
 
-from charmhelpers.core.hookenv import (
-    relation_set,
-    relation_get,
-    config,
-    is_leader,
-    leader_get,
-    leader_set
-    status_set,
-    Hooks,
-    local_unit,
-    network_get_primary_address,
+from lxd_clustering_utils import (
+    init_cluster,
+    join_cluster,
 )
 
 from charmhelpers.core.fetch import (
@@ -21,78 +11,73 @@ from charmhelpers.core.fetch import (
     apt_install,
     apt_purge,
 )
+
+from charmhelpers.core.hookenv import (
+    config,
+    Hooks,
+    is_leader,
+    leader_set,
+    log,
+    network_get_primary_address,
+    related_units,
+    relation_set,
+    relation_get,
+    status_set,
+)
+
 from charmhelpers.core.fetch.snap import (
     snap_install,
 )
 
-hooks = Hooks()
+from charmhelpers.contrib.openstack.context import (
+    ensure_packages,
+)
 
-PRESEED = {
-    'config':
-        {'core.https_address': network_get_primary_address(),
-         'core.trust_password': 'cluster',
-         'maas.api.key': config('maas-oauth'),
-         'maas.api.url': config('maas-url')
-         },
-        'cluster': {'server_name': socket.gethostname(),
-                    'enabled': True,
-                    'cluster_address': '',
-                    'cluster_certificate': '',
-                    'cluster_password': ''},
-        'networks': [],
-        'storage_pools': [
-            {'config': {'source': config('host-block-device')},
-             'description': '',
-             'name': 'local',
-             'driver': 'zfs'}],
-        'profiles': [
-            {'config': {},
-             'description': '',
-             'devices':
-                {'eth0': {'maas.subnet.ipv4': config('cluster-cidr'),
-                          'name': 'eth0',
-                          'nictype': 'bridged',
-                          'parent': config('host-bridge-interface'),
-                          'type': 'nic'},
-                 'root': {'path': '/',
-                          'pool': 'local',
-                          'type': 'disk'}},
-                 'name': 'default'}]}
+hooks = Hooks()
 
 
 @hooks.hook('install')
 def install():
     '''Install lxd here'''
+    status_set('maintenance', 'Installing charm packages')
     apt_purge('lxd lxd-client')
     apt_update()
     apt_install('zfsutils-linux')
     snap_install('lxd')
 
+    status_set('maintenance', 'Setting up zfs pool')
+    log('Creating lxc storage "local" using zpool at {}.'.format(
+        config('host-block-device')))
+    subprocess.call(['lxc', 'storage', 'create', 'local', 'zfs',
+                     'source={}'.format(config('host-block-device'))])
+    status_set('active', 'Unit is ready')
+
 
 @hooks.hook('config-changed',
             'upgrade-charm',)
 def config_changed():
-    '''Update installed packages'''
+    '''Update installed packages, nothing else for now'''
     packages = config('extra-packages')
+    ensure_packages(packages)
 
 
 @hooks.hook('cluster-relation-joined',
             'cluster-relation-changed',)
 def cluster_changed(relation_id=None):
     '''Perform LXD clustering operations here'''
-    rdata = relation_get(rid=relation_id)
+    rdata = relation_get(rid=relation_id)['cluster-cert']
 
     if is_leader() and not rdata:
         leader_set(settings={'cluster-ip': network_get_primary_address()})
-        cmd = ['lxd', 'init', '--preseed', yaml.dump(PRESEED)]
-        subprocess.call(cmd)
+        cert = init_cluster()
         for rid in related_units('cluster'):
             relation_set(relation_id=rid,
                          relation_settings={'cluster-cert': cert})
     elif not is_leader() and relation_get(rid=relation_id):
-        PRESEED['config']['cluster']['cluster_address'] = \
-            leader_get('cluster-ip')
-        PRESEED['config']['cluster']['cluster_address'] = \
-            rdata['cert']
-        cmd = ['lxd', 'init', '--preseed', yaml.dump(PRESEED)]
-        subprocess.call(cmd)
+        join_cluster(rdata)
+
+
+@hooks.hook('cluster-relation-departed')
+def cluster_departed():
+    '''Remove the unit from the cluster when it's torn down'''
+    pass
