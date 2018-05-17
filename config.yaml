@@ -1,0 +1,29 @@
+options:
+  extra-packages:
+    type: string
+    default:
+    description: Comma separated list of extra packages.
+  maas-oauth:
+    type: string
+    default:
+    description: MAAS oauth token to use for LXD cluster
+  maas-url:
+    type: string
+    default:
+    description: MAAS controller URL
+  cluster-cidr:
+    type: string
+    default: '10.0.0.0/24'
+    description: CIDR for LXD cluster
+  host-bridge-interface:
+    type: string
+    default: br0
+    description: Existing host bridge interface for LXD cluster
+  host-block-device:
+    type: string
+    default: '/dev/vdb'
+    description: Existing block device for zfs storage pool
+  host-pool-size:
+    type: int
+    default: 15
+    description: Desired zfs pool size in GB

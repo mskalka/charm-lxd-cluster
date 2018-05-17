@@ -1,0 +1,11 @@
+name: lxd-cluster
+summary: LXD clustering charm
+maintainer: Michael Skalka <Michael.Skalka@canonical.com>
+description: |
+  LXD Clustering charm
+tags:
+  - misc
+subordinate: false
+peers:
+  cluster:
+    interface: cluster
