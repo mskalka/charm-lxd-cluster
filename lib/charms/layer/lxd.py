@@ -20,9 +20,7 @@ PRESEED = {
          },
     'cluster': {'server_name': socket.gethostname(),
                 'enabled': True,
-                'cluster_address': '',
-                'cluster_certificate': '',
-                'cluster_password': ''},
+                'cluster_password': 'ubuntu'},
     'networks': [{'name': 'lxdbr0',
                   'type': 'bridge',
                   'config': {'ipv4.address': 'auto',
@@ -35,6 +33,7 @@ PRESEED = {
          'driver': 'zfs'}],
     'profiles': [
         {'config': {},
+         'name': 'default',
          'description': '',
          'devices':
             {'eth0': {'maas.subnet.ipv4': config('cluster-cidr'),
@@ -45,16 +44,33 @@ PRESEED = {
              'root': {'path': '/',
                       'pool': 'local',
                       'type': 'disk'}},
-             'name': 'default'}]}
+         }]}
+
+
+def init_storage():
+    log('Creating lxc storage "local" using zpool at {}.'.format(
+        config('host-block-device')))
+    subprocess.call(['lxc', 'storage', 'create', 'local', 'zfs',
+                     'source={}'.format(config('host-block-device'))])
 
 
 def init_cluster():
-    preseed = preseed_add_defaults()
     log('Initializing LXD cluster')
-    cmd = ['lxd', 'init', '--preseed', yaml.dump(preseed)]
-    subprocess.call(cmd)
-    with open('/var/lib/lxd/server.crt') as cert_file:
-        cert = cert_file.read()
+    preseed = preseed_add_defaults()
+    cmd = ['lxd', 'init', '--debug', '--preseed']
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    proc.stdin.write(yaml.dump(preseed))
+    proc.stdin.close()
+    while proc.returncode is None:
+        proc.poll()
+
+    return get_cluster_certificate()
+
+
+def get_cluster_certificate():
+    cmd = ['lxc', 'info']
+    cert = yaml.load(
+        subprocess.check_output(cmd))['environment']['certificate']
     return cert
 
 
@@ -71,5 +87,6 @@ def preseed_add_defaults(subordinate=False, cert=None):
         preseed['maas.api.url'] = config('maas-url')
     if subordinate:
         preseed['cluster']['cluster_address'] = leader_get('cluster-ip')
-        preseed['cluster']['cluster_certificate'] = cert
+        if cert:
+            preseed['cluster']['cluster_certificate'] = cert
     return preseed
