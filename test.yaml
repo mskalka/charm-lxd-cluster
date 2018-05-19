@@ -1,0 +1,65 @@
+config:
+  core.https_address: 172.19.131.96:8443
+  core.trust_password: ''
+cluster:
+  server_name: mskalka
+  enabled: True
+  cluster_password: ''
+  cluster_address: 172.19.131.96
+  cluster_certificate: |
+    -----BEGIN CERTIFICATE-----
+    MIIFUDCCAzigAwIBAgIRAMdoleL46ePp+UbOVJFEF7MwDQYJKoZIhvcNAQELBQAw
+    NTEcMBoGA1UEChMTbGludXhjb250YWluZXJzLm9yZzEVMBMGA1UEAwwMcm9vdEBt
+    c2thbGthMB4XDTE4MDQxOTE0MDM1MVoXDTI4MDQxNjE0MDM1MVowNTEcMBoGA1UE
+    ChMTbGludXhjb250YWluZXJzLm9yZzEVMBMGA1UEAwwMcm9vdEBtc2thbGthMIIC
+    IjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA7frMv6DeBHKeLCwrUfP9glL0
+    zpeiJTcf1W24nDzpomFwPcLQwwtLnxbdJ8WPcto9x/9+tZ99Cg7DDMfTJxzWxOCE
+    cwXNtVNB3HvCwtqfAmhKDmAhJuDekAj6ZTcGZj1Ya2pYNz2qU6Zb1LwnsIhgKqQv
+    pSj79ka05Cg8JEi72UK9IV68vq6bLCmak89omvsz3kfuEENzvWlEnvbdhy24Pkkv
+    Q99SgHKIp7a/IkPp6nSv+Kg7yM0iawxRQ4wJrQ90vEmGIP/4pMB4I4pkfQGpHnk2
+    fDQqfZpLN4w5yHb788s4HpAPYnueMUWzb7TOiZx9McMZqRY6sLYzLVwf/3zs4irc
+    wkjHuJqbjW2N4EZ7TeNejt3N8T9g1/qLvpCEsFaRN7fOoReQs7ZsUdSs3NdO02HQ
+    qElQOthcbzCFOmVUBpXeUJ8EoO1xkSDw837uSKTUEgMAmPw3h757WF6+i1dzPx/O
+    dxkwRrshiUzGfAlN/y++v8L4Nah3Ufo+fvQiOTXEIA7bGPs+usvc7HL7Exw1e2uy
+    bMPGMMu0PsL4OkeE5PqR6zrFB0/OWhg4fdiWu06w2b4BoLAiBvEHg0mlpahZo91S
+    oCNZgAquhnflKVqoYQjQK9LUFJbaBwGnElzX9HXcABkiTsJmulGFHrOk6KZP48Kz
+    S2xkCG1z2UtU0FS27OUCAwEAAaNbMFkwDgYDVR0PAQH/BAQDAgWgMBMGA1UdJQQM
+    MAoGCCsGAQUFBwMBMAwGA1UdEwEB/wQCMAAwJAYDVR0RBB0wG4IHbXNrYWxrYYcE
+    wKgBq4cECmwVAYcECgADATANBgkqhkiG9w0BAQsFAAOCAgEAb/l0YuACz5uzx1ki
+    HftTfc444W0nkRX2sAvKgWihiTazcxUk8tMFRMkAOy9GC3rRFBk4MqDvcXdrrW+K
+    3/BarepC6aotJG9uS+3/seIaSV55jZXy4A8bLGLguGKNW5lE9nnO5j+5LGvHgDhk
+    Tfw68NopX8cT+ixo5r2CgOP3zj2mtzmTeGtvqDTAcxPWCL0nlHyENmIfkqr4Fy0d
+    BD5M/XxhSswVKrRnmLDibJV3FZg6gtCK3kKaUReGZZlrXAYWN+ELBnJvtE+ibOJG
+    svMS83+xMLiaipjuuwPGj/rF8CfiYAd4u2CQuKB0a0tdpicLpWsMj/mrSjnwQcHU
+    +ERSOSFKXU0JQ02xVF/8tOSwQ+3A/oZvF1LTQoDyQChhxLT4SGS0kjlp25q8zSN5
+    6QfBbLHKV+13bZqGGHEJqmjDgwPxN3lxK7680lkd+vSy6ekuaPbfPgwqJS40Howx
+    j11ed7gkNLIESj0WuiBUxT8QaqKwBeK57kG56Hf6I9ROp92+RXDalk4XtCacwCFO
+    Sd3frK/4hZn83sVSHKWTXIPxspSgSv4kxUTEySLo3defMwDCe9mZ2smTu5XoI2FZ
+    YHMF+EHXn6zMWEDiaMPEFtleExTZmdyVQOp97HlEX4rnvMUcRZ1nkkfz1h8CNUNm
+    BJgr2Yl6RWWzgCQIL3Bf+mRqsrM=
+    -----END CERTIFICATE-----
+networks:
+- name: lxdbr0
+  type: bridge
+  config:
+    ipv4.address: auto
+    ipv6.address: none
+storage_pools:
+- config:
+  description: ''
+  name: local
+  driver: zfs
+profiles:
+- config: {}
+  description: ''
+  devices:
+    eth0:
+      name: eth0
+      nictype: bridged
+      parent: lxdbr0
+      type: nic
+    root:
+      path: '/'
+      pool: local
+      type: disk
+  name: default

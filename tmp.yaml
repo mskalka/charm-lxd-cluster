@@ -1,0 +1,18 @@
+cluster: {cluster_certificate: '', cluster_password: '', enabled: true, server_name: mskalka}
+config: {core.https_address: '172.19.131.96:8443', core.trust_password: cluster}
+networks:
+- config: {ipv4.address: auto, ipv6.address: none}
+  name: lxdbr0
+  type: bridge
+profiles:
+- config: {}
+  description: ''
+  devices:
+    eth0: {name: eth0, nictype: bridged, parent: lxdbr0, type: nic}
+    root: {path: /, pool: local, type: disk}
+  name: default
+storage_pools:
+- config: {}
+  description: ''
+  driver: zfs
+  name: local

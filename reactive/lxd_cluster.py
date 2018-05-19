@@ -1,32 +1,34 @@
 #!/usr/bin/env python3
 
-from base64 import (
-    b64encode,
-    b64decode
+from charms.reactive import (
+    hook,
+    set_state,
+    remove_state,
+    when,
+    when_not,
 )
-
-import subprocess
-
-from charms.reactive import when
-from charms.reactive import when_any
-from charms.reactive import when_not
-from charms.reactive import set_state
-from charms.reactive import remove_state
 
 from charms.layer.lxd import (
     init_cluster,
+    init_storage,
     join_cluster,
 )
 
 from charmhelpers.fetch import (
-    apt_update,
-    apt_install,
     apt_purge,
 )
 
 from charms.layer import snap
 
-from charmhelpers.core import hookenv
+from charmhelpers.core.hookenv import (
+    config,
+    is_leader,
+    leader_get,
+    leader_set,
+    log,
+    status_set,
+    unit_private_ip,
+)
 
 from charmhelpers.contrib.openstack.context import (
     ensure_packages,
@@ -45,7 +47,7 @@ def prepare_machine():
 @when('lxd.machine.ready')
 @when_not('snap.installed.lxd')
 def install_snap():
-    channel = hookenv.config('channel')
+    channel = config('channel')
     # Grab the snap channel from config
     snap.install('lxd', channel=channel)
 
@@ -53,19 +55,15 @@ def install_snap():
 @when('snap.installed.lxd')
 @when_not('lxd.ready')
 def install():
-
     status_set('maintenance', 'Setting up zfs pool')
-    log('Creating lxc storage "local" using zpool at {}.'.format(
-        config('host-block-device')))
-    subprocess.call(['lxc', 'storage', 'create', 'local', 'zfs',
-                     'source={}'.format(config('host-block-device'))])
+    init_storage()
     status_set('active', 'Unit is ready')
     set_state('lxd.ready')
 
 
 @when('config.changed.extra-packages')
 def config_changed():
-    '''Update installed packages, nothing else for now'''
+    '''Update installed packages, more to come'''
     packages = config('extra-packages')
     ensure_packages(packages)
 
@@ -76,32 +74,32 @@ def remove_states():
     remove_state('lxd.installed')
 
 
-# TODO: Oh no, need to create interface
-@hooks.hook('cluster-relation-joined',
-            'cluster-relation-changed',)
-def cluster_changed(relation_id=None):
-    '''Perform LXD clustering operations here'''
-
+@hook('leader-elected')
+def set_cluster_ip():
     if is_leader():
-        # Check if we have certs already
-        if not certs:
-            #init this shitttt
-            # Generate them
-            leader_set(certs)
-
-    c_cert = b64decode(relation_get(rid=relation_id).get('cluster-cert', ''))
-
-    if is_leader() and len(c_cert):
         leader_set(settings={'cluster-ip': unit_private_ip()})
-        n_cert = b64encode(init_cluster())
-        for rid in related_units('cluster'):
-            relation_set(relation_id=rid,
-                         relation_settings={'cluster-cert': n_cert})
-    elif not is_leader() and len(c_cert):
-        join_cluster(c_cert)
+    else:
+        log('Not the leader, passing')
 
 
-@hooks.hook('cluster-relation-departed')
-def cluster_departed():
-    '''Remove the unit from the cluster when it's torn down'''
-    pass
+@when('lxd-cluster.connected')
+def initialize_cluster():
+    if is_leader():
+        leader_set(settings={'cluster-ip': unit_private_ip(),
+                             'cluster-cert': init_cluster()})
+        set_state('cluster-initialized')
+    else:
+        log('Not the leader, waiting for leader to initialize cluster.')
+
+
+@when('lxd-cluster.connected',
+      'cluster-initialized')
+def connect_cluster():
+    if is_leader():
+        return
+    cert = leader_get('cluster-cert')
+    if cert:
+        join_cluster(cert)
+    else:
+        log('Something went wrong here; certificate not set, '
+            'passing until available.')
