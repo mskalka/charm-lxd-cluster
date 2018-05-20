@@ -50,8 +50,9 @@ PRESEED = {
 def init_storage():
     log('Creating lxc storage "local" using zpool at {}.'.format(
         config('host-block-device')))
-    subprocess.call(['lxc', 'storage', 'create', 'local', 'zfs',
-                     'source={}'.format(config('host-block-device'))])
+    cmd = ['lxc', 'storage', 'create', 'local', 'zfs',
+           'source={}'.format(config('host-block-device'))]
+    subprocess.call(cmd)
 
 
 def init_cluster():

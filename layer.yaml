@@ -2,7 +2,7 @@ repo: https://github.com/mskalka/charm-lxd-cluster.git
 includes:
   - 'layer:basic'
   - 'layer:snap'
-  - 'interface:lxd'
+  - 'interface:lxd-cluster'
 options:
   basic:
     packages:

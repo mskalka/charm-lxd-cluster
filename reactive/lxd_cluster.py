@@ -39,8 +39,7 @@ from charmhelpers.contrib.openstack.context import (
 def prepare_machine():
     '''Install lxd here'''
     status_set('maintenance', 'Preparing machine')
-    apt_purge('lxd lxd-client')
-
+    apt_purge(['lxc', 'lxd', 'lxd-client'])
     set_state('lxd.machine.ready')
 
 
@@ -64,8 +63,8 @@ def install():
 @when('config.changed.extra-packages')
 def config_changed():
     '''Update installed packages, more to come'''
-    packages = config('extra-packages')
-    ensure_packages(packages)
+    if config('extra-packages'):
+        ensure_packages(config('extra-packages').split(','))
 
 
 @hook('upgrade-charm')
