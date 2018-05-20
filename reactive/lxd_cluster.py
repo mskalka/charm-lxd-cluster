@@ -9,8 +9,8 @@ from charms.reactive import (
 )
 
 from charms.layer.lxd import (
+    get_cluster_certificate,
     init_cluster,
-    init_storage,
     join_cluster,
 )
 
@@ -51,26 +51,11 @@ def install_snap():
     snap.install('lxd', channel=channel)
 
 
-@when('snap.installed.lxd')
-@when_not('lxd.ready')
-def install():
-    status_set('maintenance', 'Setting up zfs pool')
-    init_storage()
-    status_set('active', 'Unit is ready')
-    set_state('lxd.ready')
-
-
 @when('config.changed.extra-packages')
 def config_changed():
     '''Update installed packages, more to come'''
     if config('extra-packages'):
         ensure_packages(config('extra-packages').split(','))
-
-
-@hook('upgrade-charm')
-def remove_states():
-    # stale state cleanup (pre rev6)
-    remove_state('lxd.installed')
 
 
 @hook('leader-elected')
@@ -81,24 +66,41 @@ def set_cluster_ip():
         log('Not the leader, passing')
 
 
-@when('lxd-cluster.connected')
+@when('cluster.joined',
+      'snap.installed.lxd')
+@when_not('lxd-cluster-joined')
 def initialize_cluster():
-    if is_leader():
-        leader_set(settings={'cluster-ip': unit_private_ip(),
-                             'cluster-cert': init_cluster()})
-        set_state('cluster-initialized')
+    if not leader_get('cluster-ip'):
+        log('Cluster IP not set, waiting to initialize.')
+        return
+    if is_leader() and not leader_get('cluster-started'):
+        init_cluster()
+        cert = get_cluster_certificate()
+        cluster_ip = unit_private_ip() # TODO: FIXME with network_get_primary_address('cluster')
+        leader_set(settings={'cluster-ip': cluster_ip,
+                             'cluster-cert': cert,
+                             'cluster-started': True})
+        set_state('lxd-cluster-joined')
+        status_set('active', 'Unit is ready and clustered')
     else:
         log('Not the leader, waiting for leader to initialize cluster.')
 
 
-@when('lxd-cluster.connected',
-      'cluster-initialized')
+@when('cluster.joined')
+@when_not('lxd-cluster-joined')
 def connect_cluster():
     if is_leader():
         return
+    if not leader_get('cluster-started'):
+        status_set('waiting', 'Waiting for leader to init cluster')
+        log('Waiting for leader to start cluster, passing.')
+        return
     cert = leader_get('cluster-cert')
     if cert:
+        log('Certificate found, joining the cluster')
         join_cluster(cert)
+        set_state('lxd-cluster-joined')
+        status_set('active', 'Unit is ready and clustered')
     else:
-        log('Something went wrong here; certificate not set, '
-            'passing until available.')
+        log('Certificate not set, passing until available.')
+        return
