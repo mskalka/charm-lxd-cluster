@@ -19,3 +19,7 @@ options:
     type: string
     default: '/dev/xvdf'
     description: Existing block device for zfs storage pool
+  channel:
+    type: string
+    default: 3.0/stable
+    description: The snap channel to install from
