@@ -19,6 +19,10 @@ options:
     type: string
     default: '/dev/xvdf'
     description: Existing block device for zfs storage pool
+  host-bridge:
+    type: string
+    default: 'lxdbr0'
+    description: Existing linux bridge for LXD network
   channel:
     type: string
     default: 3.0/stable

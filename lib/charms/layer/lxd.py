@@ -9,7 +9,7 @@ from charmhelpers.core.hookenv import (
     config,
     leader_get,
     log,
-    unit_private_ip,
+    network_get_primary_address,
 )
 
 
@@ -37,7 +37,7 @@ PRESEED = yaml.load("""
         eth0:
           name: eth0
           nictype: bridged
-          parent: lxdbr0
+          parent: ''
           type: nic
         root:
           path: '/'
@@ -94,8 +94,9 @@ def _preseed_add_defaults(subordinate=False, cert=None):
         if cert:
             preseed['cluster']['cluster_certificate'] = cert
     preseed['config']['core.https_address'] = '{}:8443'.format(
-        unit_private_ip())
+        network_get_primary_address('cluster'))
     preseed['cluster']['server_name'] = socket.gethostname()
     preseed['storage_pools'][0]['config']['source'] = config(
         'host-block-device')
+    preseed['profiles'][0]['devices']['eth0']['parent'] = config('host-bridge')
     return yaml.dump(preseed)

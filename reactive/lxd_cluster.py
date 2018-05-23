@@ -11,10 +11,12 @@ from charms.reactive import (
 from charms.layer.lxd import (
     get_cluster_certificate,
     init_cluster,
+    is_unit_clustered,
     join_cluster,
 )
 
 from charmhelpers.fetch import (
+    apt_install,
     apt_purge,
 )
 
@@ -26,8 +28,8 @@ from charmhelpers.core.hookenv import (
     leader_get,
     leader_set,
     log,
+    network_get_primary_address,
     status_set,
-    unit_private_ip,
 )
 
 from charmhelpers.contrib.openstack.context import (
@@ -40,6 +42,7 @@ def prepare_machine():
     '''Install lxd here'''
     status_set('maintenance', 'Preparing machine')
     apt_purge(['lxc', 'lxd', 'lxd-client'])
+    apt_install('criu')
     set_state('lxd.machine.ready')
 
 
@@ -61,7 +64,8 @@ def config_changed():
 @hook('leader-elected')
 def set_cluster_ip():
     if is_leader():
-        leader_set(settings={'cluster-ip': unit_private_ip()})
+        leader_set(settings={
+            'cluster-ip': network_get_primary_address('cluster')})
     else:
         log('Not the leader, passing')
 
@@ -73,13 +77,12 @@ def initialize_cluster():
     if not leader_get('cluster-ip'):
         log('Cluster IP not set, waiting to initialize.')
         return
-    if is_leader() and not leader_get('cluster-started'):
+    if is_leader() and not is_unit_clustered():
         init_cluster()
         cert = get_cluster_certificate()
-        cluster_ip = unit_private_ip() # TODO: FIXME with network_get_primary_address('cluster')
+        cluster_ip =  network_get_primary_address('cluster')
         leader_set(settings={'cluster-ip': cluster_ip,
-                             'cluster-cert': cert,
-                             'cluster-started': True})
+                             'cluster-cert': cert})
         set_state('lxd-cluster-joined')
         status_set('active', 'Unit is ready and clustered')
     else:
@@ -89,9 +92,9 @@ def initialize_cluster():
 @when('cluster.joined')
 @when_not('lxd-cluster-joined')
 def connect_cluster():
-    if is_leader():
+    if is_leader() or is_unit_clustered():
         return
-    if not leader_get('cluster-started'):
+    if leader_get('cluster-started'):
         status_set('waiting', 'Waiting for leader to init cluster')
         log('Waiting for leader to start cluster, passing.')
         return
